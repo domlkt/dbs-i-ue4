@@ -13,6 +13,8 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 import java.sql.*; //hinzugefügt
+import java.util.*;
+
 
 @ChosenImplementation(true)
 public class JDBCExerciseJavaImplementation implements JDBCExercise {
@@ -46,10 +48,6 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
         logger.info(keywords);
         List<Movie> movies = new ArrayList<>();
 
-        //Verbindung zu DB herstellen
-        //schauen, wie man SQL Befehle abschickt und wie man die Ergebnisse empfängt
-
-
 		/*
 		var myMovie = new Movie("??????????", "My Movie", 2023, Set.of("Indie"));
 		myMovie.actorNames.add("Myself");
@@ -57,35 +55,51 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
 		*/
 
 
-        // Create a statement object to execute queries
         Statement statement = connection.createStatement();
 
-
-        /*
-		Skizze SQL Anfrage 1, Filme mit String "keyword" im Namen:
-		------------
-		SELECT primaryTitle FROM tmovies
-		WHERE titel LIKE '% + keyword + %'
-		ORDER BY titel ASC, year ASC
-		*/
-
         //gebraucht werden tconst, title, year, genres (das sind die Attribute des Objektes Movie)
-        String anfrage1 = "SELECT \"primaryTitle\" FROM tmovies WHERE \"primaryTitle\" LIKE '%" +  keywords + "%' ORDER BY \"primaryTitle\" ASC, \"startYear \" ASC";
+        String anfrage1 = "SELECT tconst, \"primaryTitle\", \"startYear\", genres " +
+                "FROM tmovies WHERE \"primaryTitle\" LIKE '%" +  keywords + "%' " +
+                "ORDER BY \"primaryTitle\" ASC, \"startYear \" ASC";
 
 
-        // Execute a query and get the result set
         ResultSet resultSet = statement.executeQuery(anfrage1);
 
-        //das ergebnis jetzt in liste zwischenspeichern
-
-        //wir haben nur Filmnamen abgefragt, deswegen werden auch nur diese in Liste geschrieben werden können
         while (resultSet.next()) {
-            //only colum is primarytitle of respective movies
-            System.out.println("Column1: " + resultSet.getString("primaryTitle"));
 
-            var myMovie = new Movie("??????????", resultSet.getString("primaryTitle"), -1, Set.of(""));
+            /*start of converting genres to set for movie object*/
+            String genres = resultSet.getString("genres").substring(1, resultSet.getString("genres").length() - 1);
+            String[] genresArr = genres.split(",");
+
+            Set<String> genresSet = new HashSet<String>();
+
+            for(int i = 0; i < genresArr.length; i++){
+                genresSet.add(genresArr[i]);
+            }
+            /*end*/
+
+            var myMovie = new Movie(resultSet.getString("tconst"), resultSet.getString("primaryTitle"), resultSet.getInt("startYear"), genresSet);
             //myMovie.actorNames.add("Myself");
+
             movies.add(myMovie);
+
+            //Abfragen, welche Schauspieler in dem Film mitgespielt haben
+
+            String anfrage2 = "SELECT DISTINCT nbasics.primaryname\n" +
+                    "FROM nbasics, tprincipals, tmovies" +
+                    "WHERE nbasics.nconst = tprincipals.nconst " +
+                    "AND tprincipals.tconst = tmovies.tconst AND (tprincipals.category = 'actress' OR tprincipals.category = 'actor') " +
+                    "AND tmovies.\"primaryTitle\" =" + resultSet.getString("primaryTitle") +
+                    "ORDER BY nbasics.primaryname ASC";
+
+
+            ResultSet subResultSet = statement.executeQuery(anfrage2);
+
+
+            while (subResultSet.next()) {
+                myMovie.actorNames.add(resultSet.getString("primaryname"));
+            }
+
         }
 
 
@@ -107,7 +121,8 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
 
         String anfrage2 = "SELECT DISTINCT nbasics.primaryname\n" +
                 "FROM nbasics, tprincipals, tmovies" +
-                "WHERE nbasics.nconst = tprincipals.nconst AND tprincipals.tconst = tmovies.tconst AND tprincipals.category = 'actress'" +
+                "WHERE nbasics.nconst = tprincipals.nconst " +
+                "AND tprincipals.tconst = tmovies.tconst AND tprincipals.category = 'actress'" +
                 "AND tmovies.\"primaryTitle\" IN" +
                 "(" +
                 "SELECT \"primaryTitle\" FROM tmovies" +
@@ -116,7 +131,9 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
                 ")" +
                 "ORDER BY nbasics.primaryname ASC";
 
-        throw new UnsupportedOperationException("Not yet implemented");
+        //throw new UnsupportedOperationException("Not yet implemented");
+
+        return movies;
     }
 
     @Override
