@@ -45,7 +45,13 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
 
     @Override
     public List<Movie> queryMovies(@NotNull Connection connection, @NotNull String keywords) throws SQLException {
+
+
+
+
+
         logger.info(keywords);
+
         List<Movie> movies = new ArrayList<>();
 
 		/*
@@ -58,13 +64,10 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
         Statement statement = connection.createStatement();
 
         //gebraucht werden tconst, title, year, genres (das sind die Attribute des Objektes Movie)
-        String anfrage1 = "SELECT tmovies.tconst, tmovies.\"primaryTitle\", tmovies.\"startYear\", tmovies.genres " +
-                "FROM tmovies WHERE \"primaryTitle\" LIKE '%" +  keywords + "%' " +
-                "ORDER BY \"primaryTitle\" ASC, \"startYear \" ASC";
+        String anfrage1 = "SELECT tmovies.tconst, tmovies.\"primaryTitle\", tmovies.\"startYear\", tmovies.genres FROM tmovies WHERE tmovies.\"primaryTitle\" LIKE '%" +  keywords + "%' ORDER BY tmovies.\"primaryTitle\" ASC, tmovies.\"startYear\" ASC";
 
 
         ResultSet resultSet = statement.executeQuery(anfrage1);
-
         while (resultSet.next()) {
 
             /*start of converting genres to set for movie object*/
@@ -82,44 +85,22 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
             //myMovie.actorNames.add("Myself");
 
 
+            System.out.println(resultSet.getString("primaryTitle"));
+
             //Abfragen, welche Schauspieler in dem Film mitgespielt haben
+            String anfrage2 = "SELECT DISTINCT nbasics.primaryname FROM nbasics, tprincipals, tmovies WHERE nbasics.nconst = tprincipals.nconst AND tprincipals.tconst = tmovies.tconst AND (tprincipals.category = 'actress' OR tprincipals.category = 'actor') AND tmovies.\"primaryTitle\" ='" + resultSet.getString("primaryTitle") + "' AND tmovies.\"startYear\" = " + resultSet.getInt("startYear") + " ORDER BY nbasics.primaryname ASC";
 
-            String anfrage2 = "SELECT DISTINCT nbasics.primaryname\n" +
-                    "FROM nbasics, tprincipals, tmovies" +
-                    "WHERE nbasics.nconst = tprincipals.nconst " +
-                    "AND tprincipals.tconst = tmovies.tconst AND (tprincipals.category = 'actress' OR tprincipals.category = 'actor') " +
-                    "AND tmovies.\"primaryTitle\" =" + resultSet.getString("primaryTitle") +
-                    "ORDER BY nbasics.primaryname ASC";
-
-
-            ResultSet subResultSet = statement.executeQuery(anfrage2);
-
-
+            Statement subStatement = connection.createStatement();
+            ResultSet subResultSet = subStatement.executeQuery(anfrage2);
             while (subResultSet.next()) {
-                myMovie.actorNames.add(resultSet.getString("primaryname"));
+                myMovie.actorNames.add(subResultSet.getString("primaryname"));
             }
-
 
             movies.add(myMovie);
 
         }
 
 
-
-		/*
-		Skizze SQL Anfrage 2, Schauspielerinnen in dem Film:
-		------------
-		SELECT nbasics."primaryName"
-		FROM nbasics, tprincipals, tmovies
-		WHERE nbasics.nconst = tprincipals.nconst AND tprincipals.tconst = tmovies.tconst AND tprincipals.category = 'actress'
-		AND tmovies."primaryTitle" IN
-		(
-			SELECT primaryTitle FROM tmovies
-			WHERE titel LIKE '% + keyword + %'
-			ORDER BY titel ASC, year ASC
-		)
-		ORDER BY nbasics."primaryName" ASC
-		*/
 
         //throw new UnsupportedOperationException("Not yet implemented");
 
@@ -134,19 +115,10 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
         logger.info(keywords);
         List<Actor> actors = new ArrayList<>();
 
-//****************************************************************************************************************************************************************
-
-
         Statement statement = connection.createStatement();
 
-        //gebraucht werden nconst und name des Schauspielers
-        String anfrage1 = "SELECT nbasics.nconst, nbasics.primaryname" +
-                "FROM nbasics, tprincipals" +
-                "WHERE nbasics.nconst = tprincipals.nconst AND nbasics.primaryname LIKE '%" + keywords + "%'" +
-                "AND (tprincipals.category = 'actor' OR tprincipals.category = 'actress')" +
-                "GROUP BY nbasics.primaryname" +
-                "ORDER BY COUNT(*) DESC, nbasics.primaryname ASC" +
-                "LIMIT 5";
+        //gebraucht werden nconst und Name des Schauspielers
+        String anfrage1 = "SELECT nbasics.nconst, nbasics.primaryname FROM nbasics, tprincipals WHERE nbasics.nconst = tprincipals.nconst AND nbasics.primaryname LIKE '%" + keywords + "%' AND (tprincipals.category = 'actor' OR tprincipals.category = 'actress') GROUP BY nbasics.nconst, nbasics.primaryname ORDER BY COUNT(*) DESC, nbasics.primaryname ASC LIMIT 5";
 
 
         ResultSet resultSet = statement.executeQuery(anfrage1);
@@ -159,18 +131,15 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
             //Start Subquery 1
 
             //Abfragen, welche die fünf neuesten Filme sind, in denen der aktuelle Schauspieler mitgespielt hat
-            String anfrage2 = "SELECT tmovies.\"primaryTitle\"" +
-                    "FROM tmovies, tprincipals, nbasics" +
-                    "WHERE tmovies.tconst = tprincipals.tconst AND tprincipals.nconst = nbasics.nconst AND nbasics.primaryname = '" + resultSet.getString("primaryname") + "'" +
-                    "ORDER BY tmovies.\"startYear\" DESC, tmovies.\"primaryTitle\" ASC" +
-                    "LIMIT 5";
+            String anfrage2 = "SELECT DISTINCT tmovies.\"primaryTitle\", tmovies.\"startYear\" FROM tmovies, tprincipals, nbasics WHERE tmovies.tconst = tprincipals.tconst AND tprincipals.nconst = nbasics.nconst AND nbasics.primaryname = '" + resultSet.getString("primaryname") + "' ORDER BY tmovies.\"startYear\" DESC, tmovies.\"primaryTitle\" ASC LIMIT 5";
 
 
-            ResultSet subResultSet = statement.executeQuery(anfrage2);
+            Statement subStatement = connection.createStatement();
+            ResultSet subResultSet = subStatement.executeQuery(anfrage2);
 
 
             while (subResultSet.next()) {
-                myActor.playedIn.add(subResultSet.getString("tmovies.\"primaryTitle\""));
+                myActor.playedIn.add(subResultSet.getString("primaryTitle"));
             }
 
             //End Subquery 1
@@ -178,19 +147,21 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
             //Start Subquery 2
 
             //Abfragen, welche die fünf häufigsten Costars des aktuellen Schauspielers sind
-            String anfrage3 = "select nb2.primaryname, count(*)" +
-                    "from tprincipals tp1, tprincipals tp2, nbasics nb1, nbasics nb2" +
-                    "where tp1.tconst = tp2.tconst and tp1.nconst < tp2.nconst and nb1.nconst = tp1.nconst and nb2.nconst = tp2.nconst" +
-                    "and nb1.primaryname = 'Rupert Grint' and (tp2.category = 'actress' or tp2.category = 'actor')" +
-                    "group by nb1.primaryname, nb2.primaryname" +
+            String anfrage3 = "select nb2.primaryname, count(*) " +
+                    "from tprincipals tp1, tprincipals tp2, nbasics nb1, nbasics nb2 " +
+                    "where tp1.tconst = tp2.tconst and tp1.nconst <> tp2.nconst and nb1.nconst = tp1.nconst and nb2.nconst = tp2.nconst " +
+                    "and nb1.primaryname = '"+ resultSet.getString("primaryname") + "' and (tp2.category = 'actress' or tp2.category = 'actor') " +
+                    "group by nb1.primaryname, nb2.primaryname " +
                     "order by count(*) desc, nb2.primaryname asc limit 5";
 
 
-            ResultSet subResultSet2 = statement.executeQuery(anfrage3);
+            Statement subsubStatement = connection.createStatement();
+            ResultSet subResultSet2 = subsubStatement.executeQuery(anfrage3);
 
+            System.out.println("HEREEEE");
 
             while (subResultSet2.next()) {
-                myActor.costarNameToCount.put(subResultSet2.getString("nb2.primaryname"), Integer.parseInt(subResultSet2.getString("count(*)")));
+                myActor.costarNameToCount.put(subResultSet2.getString("primaryname"), Integer.parseInt(subResultSet2.getString("count")));
             }
 
             //End Subquery 2
