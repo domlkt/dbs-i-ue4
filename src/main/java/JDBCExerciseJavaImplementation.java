@@ -45,11 +45,7 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
 
     @Override
     public List<Movie> queryMovies(@NotNull Connection connection, @NotNull String keywords) throws SQLException {
-
-
-
-
-
+        
         logger.info(keywords);
 
         List<Movie> movies = new ArrayList<>();
@@ -100,8 +96,6 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
 
         }
 
-
-
         //throw new UnsupportedOperationException("Not yet implemented");
 
         return movies;
@@ -127,17 +121,15 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
 
             var myActor = new Actor(resultSet.getString("nconst"), resultSet.getString("primaryname"));
 
-
+            System.out.println("current actor: " + resultSet.getString("primaryname"));
             //Start Subquery 1
 
             //Abfragen, welche die fünf neuesten Filme sind, in denen der aktuelle Schauspieler mitgespielt hat
-            String anfrage2 = "SELECT DISTINCT tmovies.\"primaryTitle\", tmovies.\"startYear\" FROM tmovies, tprincipals, nbasics WHERE tmovies.tconst = tprincipals.tconst AND tprincipals.nconst = nbasics.nconst AND nbasics.primaryname = '" + resultSet.getString("primaryname") + "' ORDER BY tmovies.\"startYear\" DESC, tmovies.\"primaryTitle\" ASC LIMIT 5";
+            String anfrage2 = "SELECT DISTINCT tmovies.\"primaryTitle\", tmovies.\"startYear\" FROM tmovies, tprincipals, nbasics WHERE tmovies.tconst = tprincipals.tconst AND tprincipals.nconst = nbasics.nconst AND nbasics.nconst = '" + resultSet.getString("nconst") + "' AND (tprincipals.category = 'actor' or tprincipals.category = 'actress') ORDER BY tmovies.\"startYear\" DESC, tmovies.\"primaryTitle\" ASC LIMIT 5";
 
 
             Statement subStatement = connection.createStatement();
             ResultSet subResultSet = subStatement.executeQuery(anfrage2);
-
-
             while (subResultSet.next()) {
                 myActor.playedIn.add(subResultSet.getString("primaryTitle"));
             }
@@ -146,22 +138,26 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
 
             //Start Subquery 2
 
+            
             //Abfragen, welche die fünf häufigsten Costars des aktuellen Schauspielers sind
-            String anfrage3 = "select nb2.primaryname, count(*) " +
-                    "from tprincipals tp1, tprincipals tp2, nbasics nb1, nbasics nb2 " +
-                    "where tp1.tconst = tp2.tconst and tp1.nconst <> tp2.nconst and nb1.nconst = tp1.nconst and nb2.nconst = tp2.nconst " +
-                    "and nb1.primaryname = '"+ resultSet.getString("primaryname") + "' and (tp2.category = 'actress' or tp2.category = 'actor') " +
-                    "group by nb1.primaryname, nb2.primaryname " +
-                    "order by count(*) desc, nb2.primaryname asc limit 5";
+            String anfrage3 = "with moviesWith as(" +
+                    "select nb1.primaryname, nb2.primaryname as costar, tmovies.\"primaryTitle\", tmovies.\"startYear\", count(nb2.primaryname) " +
+                    "from nbasics nb1, nbasics nb2, tprincipals tp1, tprincipals tp2, tmovies " +
+                    "where tp1.tconst = tp2.tconst and tp1.nconst <> tp2.nconst " +
+                    "and tp1.nconst = nb1.nconst and tp2.nconst = nb2.nconst and tmovies.tconst = tp1.tconst " +
+                    "and nb1.nconst = '" + resultSet.getString("nconst") + "' and (tp2.category = 'actor' or tp2.category = 'actress') " +
+                    "group by nb1.primaryname, nb2.primaryname, tmovies.\"primaryTitle\", tmovies.\"startYear\" " +
+                    "order by nb2.primaryname asc, tmovies.\"startYear\" desc " +
+                    ") " +
+                    "select moviesWith.costar, count(*) from moviesWith group by moviesWith.costar order by count(*) desc, moviesWith.costar asc limit 5";
 
 
             Statement subsubStatement = connection.createStatement();
             ResultSet subResultSet2 = subsubStatement.executeQuery(anfrage3);
 
-            System.out.println("HEREEEE");
 
             while (subResultSet2.next()) {
-                myActor.costarNameToCount.put(subResultSet2.getString("primaryname"), Integer.parseInt(subResultSet2.getString("count")));
+                myActor.costarNameToCount.put(subResultSet2.getString("costar"), Integer.parseInt(subResultSet2.getString("count")));
             }
 
             //End Subquery 2
@@ -173,46 +169,6 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
             actors.add(myActor);
 
         }
-//****************************************************************************************************************************************************************
-
-		/*
-		SQL Anfrage 1, Top 5 Schauspieler in 'keyword' Filmen:
-		----------------------------------
-		WITH topfiveactors AS
-		(
-			SELECT nbasics.primaryname
-			FROM nbasics, tprincipals
-			WHERE nbasics.nconst = tprincipals.nconst AND nbasics.primaryname LIKE '%" + keywords + "%'
-	        AND (tprincipals.category = 'actor' OR tprincipals.category = 'actress')
-			GROUP BY nbasics.primaryname
-			ORDER BY COUNT(*) DESC, nbasics.primaryname ASC
-			LIMIT 5
-		),
-		bestmoviesfrommactor AS
-		(
-			SELECT tmovies."primaryTitle"
-			FROM tmovies, tprincipals, nbasics
-			WHERE tmovies.tconst = tprincipals.tconst AND tprincipals.nconst = nbasics.nconst AND nbasics.primaryname = '" + schauspielername + "'
-			ORDER BY tmovies."startYear" DESC, tmovies."primaryTitle" ASC
-			LIMIT 5
-		),
-		costars AS
-		(
-		select tp1.nconst, tp2.nconst, count(*)
-	    from tprincipals tp1, tprincipals tp2
-	    where tp1.tconst = tp2.tconst and tp1.nconst < tp2.nconst
-	    group by tp1.nconst, tp2.nconst
-		)
-
-
-
-
-
-		SELECT topfiveactors.name,
-
-		*/
-
-        //Für letzte Anfrage self join über nbasics (für Namen) und tprincipals und dann count wer am meisten mit actor 1 gearbeitet hat
 
         //throw new UnsupportedOperationException("Not yet implemented");
 
