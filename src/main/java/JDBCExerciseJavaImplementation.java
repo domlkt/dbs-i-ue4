@@ -45,7 +45,7 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
 
     @Override
     public List<Movie> queryMovies(@NotNull Connection connection, @NotNull String keywords) throws SQLException {
-        
+
         logger.info(keywords);
 
         List<Movie> movies = new ArrayList<>();
@@ -112,10 +112,11 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
         Statement statement = connection.createStatement();
 
         //gebraucht werden nconst und Name des Schauspielers
-        String anfrage1 = "SELECT nbasics.nconst, nbasics.primaryname FROM nbasics, tprincipals WHERE nbasics.nconst = tprincipals.nconst AND nbasics.primaryname LIKE '%" + keywords + "%' AND (tprincipals.category = 'actor' OR tprincipals.category = 'actress') GROUP BY nbasics.nconst, nbasics.primaryname ORDER BY COUNT(*) DESC, nbasics.primaryname ASC LIMIT 5";
-
+        String anfrage1 = "SELECT nConst, primaryName, COUNT(DISTINCT tConst) AS movieCount FROM tPrincipals NATURAL JOIN nBasics WHERE primaryName LIKE '%" + keywords + "%' AND (category = 'actor' OR category = 'actress') GROUP BY nConst, primaryName ORDER BY movieCount DESC LIMIT 5";
 
         ResultSet resultSet = statement.executeQuery(anfrage1);
+
+        int count = 0;
 
         while (resultSet.next()) {
 
@@ -130,15 +131,19 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
 
             Statement subStatement = connection.createStatement();
             ResultSet subResultSet = subStatement.executeQuery(anfrage2);
-            while (subResultSet.next()) {
-                myActor.playedIn.add(subResultSet.getString("primaryTitle"));
+            if(count == 0){
+                while (subResultSet.next()) {
+                    myActor.playedIn.add(subResultSet.getString("primaryTitle"));
+
+                }
             }
+
 
             //End Subquery 1
 
             //Start Subquery 2
 
-            
+
             //Abfragen, welche die fünf häufigsten Costars des aktuellen Schauspielers sind
             String anfrage3 = "with moviesWith as(" +
                     "select nb1.primaryname, nb2.primaryname as costar, tmovies.\"primaryTitle\", tmovies.\"startYear\", count(nb2.primaryname) " +
@@ -155,16 +160,16 @@ public class JDBCExerciseJavaImplementation implements JDBCExercise {
             Statement subsubStatement = connection.createStatement();
             ResultSet subResultSet2 = subsubStatement.executeQuery(anfrage3);
 
-
-            while (subResultSet2.next()) {
-                myActor.costarNameToCount.put(subResultSet2.getString("costar"), Integer.parseInt(subResultSet2.getString("count")));
+            if(count == 0){
+                while (subResultSet2.next()) {
+                    myActor.costarNameToCount.put(subResultSet2.getString("costar"), Integer.parseInt(subResultSet2.getString("count")));
+                }
             }
+
 
             //End Subquery 2
 
-
-
-
+            count++;
 
             actors.add(myActor);
 
